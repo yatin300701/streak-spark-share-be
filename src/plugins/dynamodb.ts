@@ -1,88 +1,91 @@
 // plugins/aws.ts
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import {
-  DynamoDBClient,
-  PutItemCommand,
-  GetItemCommand,
-  QueryCommand,
-  PutItemCommandOutput,
-  GetItemCommandOutput,
-  QueryCommandOutput,
+	DynamoDBClient,
+	PutItemCommand,
+	GetItemCommand,
+	QueryCommand,
+	PutItemCommandOutput,
+	GetItemCommandOutput,
+	QueryCommandOutput,
+	AttributeValue,
 } from "@aws-sdk/client-dynamodb";
-import { fromIni } from "@aws-sdk/credential-provider-ini";
 import fp from "fastify-plugin";
 import { marshall, unmarshall } from "@aws-sdk/util-dynamodb";
-const isLocal = process.env.USE_LOCALSTACK === "true";
 
-export default fp(function (
-  fastify: FastifyInstance,
-  opts: FastifyPluginOptions,
-  done: CallableFunction
+type DynamoKey  =  Record<string,string>;
+
+export default fp(function(
+	fastify: FastifyInstance,
+	opts: FastifyPluginOptions,
+	done: CallableFunction
 ) {
-  const dynamodb = new DynamoDBClient({
-    region: "ap-south-1",
-    endpoint: isLocal ? "http://localhost:4566" : undefined,
-    credentials: isLocal
-      ? { accessKeyId: "test", secretAccessKey: "test" }
-      : fromIni({ profile: "DynamoDb" }),
-    // credentials: fromIni({ profile: "DynamoDb" }),
-  });
+	const isLocal = fastify.config.USE_LOCALSTACK;
+	const dynamodb = new DynamoDBClient({
+		region: "ap-south-1",
+		endpoint: isLocal ? "http://localhost:4566" : undefined,
+		credentials: { accessKeyId: fastify.config.AWS_ACCESS_KEYID, secretAccessKey: fastify.config.AWS_ACCESS_KEY }
+	})
 
-  const insertItem = async <T>(tableName: string, item: T) => {
-    console.log("InsertItemCommand", isLocal, process.env.USE_LOCALSTACK);
-    const command = new PutItemCommand({
-      TableName: tableName,
-      Item: marshall(item),
-    });
-    return dynamodb.send(command);
-  };
+	const insertItem = async <T>(tableName: string, item: T) => {
+		const command = new PutItemCommand({
+			TableName: tableName,
+			Item: marshall(item),
+		});
+		return dynamodb.send(command);
+	};
 
-  const getItem = async (
-    tableName: string,
-    key: { PK: string; SK?: string }
-  ) => {
-    const Key: Record<string, { S: string }> = {
-      PK: { S: key.PK },
-    };
+	const getItem = async (
+		tableName: string,
+		key: DynamoKey
+	) => {
+		const Key: Record<string, { S: string }> = {}
 
-    if (key.SK) {
-      Key.SK = {
-        S: key.SK,
-      };
-    }
-    const command = new GetItemCommand({
-      Key: Key,
-      TableName: tableName,
-    });
-    console.log("GetItemCommand", isLocal);
-    const response = await dynamodb.send(command);
-    const item = response.Item ? unmarshall(response.Item) : undefined;
-    return {
-      ...response,
-      Item: item,
-    };
-  };
+		for(const [attrkeys , value] of Object.entries(key)){
+			Key[attrkeys]={S:value};
+		}
 
-  const queryItems = async (
-    tableName: string,
-    keyConditionExpression: string,
-    expressionAttributeValues: Record<string, { S: string }>
-  ) => {
-    const command = new QueryCommand({
-      TableName: tableName,
-      KeyConditionExpression: keyConditionExpression,
-      ExpressionAttributeValues: expressionAttributeValues,
-    });
-    const items = await dynamodb.send(command);
-    items.Items = items.Items?.map((item) => unmarshall(item));
-    return items as QueryCommandOutput;
-  };
 
-  fastify.decorate("dynamoDB", {
-    insertItem,
-    getItem,
-    queryItems,
-  });
+		const command = new GetItemCommand({
+			Key: Key,
+			TableName: tableName,
+		});
+		const response = await dynamodb.send(command);
+		const item = response.Item ? unmarshall(response.Item) : undefined;
+		return {
+			...response,
+			Item: item,
+		};
+	};
 
-  done();
+	const queryItems = async (
+		tableName: string,
+		keyConditionExpression: string,
+		expressionAttributeValues: Record<string, string >,
+		expressionAttributeNames?:Record<string,string>
+	) => {
+		const attributeValues:Record<string, { S: string }> = {};
+		for(const [key,value] of Object.entries(expressionAttributeValues)){
+			attributeValues[key] = {
+				S:value
+			}
+		}
+		const command = new QueryCommand({
+			TableName: tableName,
+			KeyConditionExpression: keyConditionExpression,
+			ExpressionAttributeValues: attributeValues,
+			ExpressionAttributeNames:expressionAttributeNames ?? {}
+		});
+		const items = await dynamodb.send(command);
+		items.Items = items.Items?.map((item) => unmarshall(item));
+		return items as QueryCommandOutput;
+	};
+
+	fastify.decorate("dynamoDB", {
+		insertItem,
+		getItem,
+		queryItems,
+	});
+
+	done();
 });

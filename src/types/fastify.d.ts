@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import {
+  AttributeValue,
   GetItemCommandOutput,
   PutItemCommandOutput,
   QueryCommandOutput,
@@ -23,26 +24,29 @@ declare module "fastify" {
         tableName: string,
         keyConditionExpression: string,
         expressionAttributeValues: Record<
-          string,
-          {
-            S: string;
-          }
-        >
+          string, string
+        >,
+        expressionAttributeNames?:Record<string,string>
       ) => Promise<QueryCommandOutput>;
       getItem: (
         tableName: string,
-        key: {
-          PK: string;
-          SK?: string;
-        }
+        key: Record<string,string>
       ) => Promise<GetItemCommandOutput>;
     };
 
     generateJWT: (payload: JwtPayload) => string;
     verifyJWT: (token: string) => Promise<JwtPayload>;
+    config: {
+      PORT: number;
+      JWT_SECRET: string;
+      USE_LOCALSTACK: string;
+      AWS_ACCESS_KEYID: string;
+      AWS_ACCESS_KEY: string;
+      HOST:string;
+    };
   }
   interface FastifyRequest {
-    user?: JwtPayload; // or your more specific user type
+    user?: JwtPayload;
   }
 }
 

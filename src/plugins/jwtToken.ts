@@ -8,7 +8,7 @@ export default fp(async function (
   opts: FastifyPluginOptions
 ) {
   fastify.register(fastifyJwt, {
-    secret: process.env.JWT_SECRET as string,
+    secret: fastify.config.JWT_SECRET as string,
     sign: {
       expiresIn: "1h",
     },
