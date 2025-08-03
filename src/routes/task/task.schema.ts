@@ -1,3 +1,7 @@
+import {
+  FastifySchema
+} from "fastify";
+
 export const GetTaskSchema = {
   response: {
     200: {
@@ -8,13 +12,13 @@ export const GetTaskSchema = {
           items: {
             type: "object",
             properties: {
-              PK: { type: "string" },
-              SK: { type: "string" },
+              id: { type: "string" },
+              type: { type: "string" },
               title: { type: "string" },
               description: { type: "string" },
               createdAt: { type: "string" },
             },
-            required: ["PK", "SK", "title", "description", "createdAt"],
+            required: ["id", "type", "title", "description", "createdAt"],
           },
         },
       },
@@ -41,4 +45,26 @@ export const PostTaskSchema = {
       },
     },
   },
+};
+
+export const PatchTaskSchema = {
+  body: {
+    type: "object",
+    properties: {
+      id: { type: "string" },
+      title: { type: "string" },
+      description: { type: "string" },
+    },
+    required: ["id"],
+    anyOf: [{ required: ["title"] }, { required: ["description"] }],
+  },
+};
+
+export const DeleteTaskSchema:FastifySchema= {
+  querystring:{
+      type:"object",
+      properties:{
+        id:{type:'string'}
+      }
+  }
 };

@@ -10,13 +10,16 @@ export default fp(async function (
   fastify.register(fastifyJwt, {
     secret: fastify.config.JWT_SECRET as string,
     sign: {
-      expiresIn: "1h",
+      expiresIn: "7d",
     },
   });
 
-  fastify.decorate("generateJWT", function (payload: JwtPayload): string {
-    return fastify.jwt.sign(payload);
-  });
+  fastify.after(()=>{
+
+    fastify.decorate("generateJWT", async function (payload: JwtPayload): Promise<string> {
+    return this.jwt.sign({payload});
+    });
+  })
 
   fastify.decorate(
     "verifyJWT",

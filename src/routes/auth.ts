@@ -33,26 +33,25 @@ async function routes(
 					":type": UserDetailsType.USER,
 					":id": req.body?.username,
 				},
-        {
-          "#type":UserDetailsType.USER,
-          "#id":"id"
-        });
+				{
+          			"#type":'type',
+          			"#id":"id"
+        		});
 				const user = userResponse.Items as any;
-				if (!user) {
+				if (!user || user.length ==0) {
 					return res.status(404).send({ message: "User not found" });
 				}
-        console.log("items",user)
 				const validPassword = await fastify.hash_compare(
 					password,
-					user.password
+					user[0].password
 				);
 				if (!validPassword) {
 					return res.status(401).send({ message: "Invalid password" });
 				}
 
-				const token = fastify.generateJWT({
-					userId: user.id,
-					username: user.name,
+				const token = await fastify.generateJWT({
+					userId: user[0].id,
+					username: user[0].name,
 				});
 
 				return res.status(200).send({
@@ -63,7 +62,9 @@ async function routes(
 						token: token,
 					},
 				});
-			} catch (err) { }
+			} catch (err) { 
+				return res.status(500).send("Error in login")
+			}
 		}
 	);
 
@@ -106,17 +107,8 @@ async function routes(
 				type: UserDetailsType.USER,
 				...user,
 				});
-				const token = fastify.generateJWT({
-					userId: id,
-					username: name,
-				});
 				return res.status(201).send({
 					message: "User created successfully",
-					user: {
-						name: user.name,
-						email: user.email,
-						token: token,
-					},
 				});
 			} catch (err) {
 				fastify.log.error(err);
